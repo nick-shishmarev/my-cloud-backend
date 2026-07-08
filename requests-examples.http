@@ -1,0 +1,47 @@
+# примеры API-запросов
+
+@baseUrl = http://localhost:8000
+
+# регистрация
+POST {{baseUrl}}/register/
+Content-Type: application/json
+
+{
+  "username": "New_User",
+  "password": "123456",
+  "fullname": "New User",
+  "email": "user@domain.com"
+}
+
+###
+
+# логин
+POST {{baseUrl}}/api-token-auth/
+Content-Type: application/json
+
+{
+  "username": "New_User",
+  "password": "123456"
+}
+
+###
+
+# логин
+POST {{baseUrl}}/api-token-auth/
+Content-Type: application/json
+
+{
+  "username": "Another_User",
+  "password": "1111111"
+}
+
+###
+
+# логин
+POST {{baseUrl}}/api-token-auth/
+Content-Type: application/json
+
+{
+  "username": "New_User",
+  "password": "1111111"
+}

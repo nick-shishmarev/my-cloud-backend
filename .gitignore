@@ -1,0 +1,29 @@
+# IDE specific
+.idea/
+.vscode/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+*.sqlite3
+env/
+venv/
+.venv/
+
+### Project specific ###
+settings_local.py
+
+### OS specific ###
+.DS_Store
+
+### Mine
+media/
+migrations/
+mine/
+mine*.*
+.env
+*.tmp
+*.temp
+*.ini
