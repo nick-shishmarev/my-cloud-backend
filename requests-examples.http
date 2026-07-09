@@ -68,3 +68,21 @@ Content-Type: application/json
 Authorization: Token 5565be1698fc225558fe8abebf19655ba013bf7a
 
 ###
+
+# плучение списка файлов
+GET {{baseUrl}}/files/
+Content-Type: application/json
+Authorization: Token 5565be1698fc225558fe8abebf19655ba013bf7a
+
+###
+
+POST {{baseUrl}}/files/
+Content-Type: application/json
+Authorization: Token 5565be1698fc225558fe8abebf19655ba013bf7a
+
+{
+  "file": [{}]
+  "original_name": "New file",
+  "display_name": "New file name",
+  "comment": "Comment"
+}
