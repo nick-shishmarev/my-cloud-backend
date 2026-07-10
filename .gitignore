@@ -19,8 +19,10 @@ settings_local.py
 .DS_Store
 
 ### Mine
+*/migrations/*
+!*/migrations/__init__.py
+
 media/
-migrations/
 mine/
 mine*.*
 .env
