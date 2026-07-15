@@ -2,6 +2,7 @@ from pathlib import Path
 
 from django.db.models import ProtectedError
 from django.http import FileResponse
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.exceptions import PermissionDenied, NotFound
@@ -177,6 +178,9 @@ class DownloadFileView(APIView):
 
         if file_obj.owner != request.user and not request.user.is_staff:
             raise PermissionDenied("Отказано в доступа к файлу - недостаточно прав")
+
+        file_obj.downloaded_at = timezone.now()
+        file_obj.save(update_fields=["downloaded_at"])
 
         response = FileResponse(
             file_obj.file.open(),
