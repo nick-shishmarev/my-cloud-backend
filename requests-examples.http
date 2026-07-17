@@ -3,12 +3,12 @@
 @baseUrl = http://localhost:8000
 
 # регистрация
-POST {{baseUrl}}/register/
+POST {{baseUrl}}/api/register/
 Content-Type: application/json
 
 {
-  "username": "New_User",
-  "password": "123456",
+  "username": "huhhjkdshjkhjkhjkh",
+  "password": "Aa3#11",
   "fullname": "New User",
   "email": "user@domain.com"
 }
@@ -16,12 +16,12 @@ Content-Type: application/json
 ###
 
 # логин
-POST {{baseUrl}}/api-token-auth/
+POST {{baseUrl}}/api/api-token-auth/
 Content-Type: application/json
 
 {
-  "username": "New_User",
-  "password": "123456"
+  "username": "nshmvaa",
+  "password": "Nshmv@1"
 }
 
 ###

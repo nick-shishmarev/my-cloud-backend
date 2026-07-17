@@ -1,25 +1,52 @@
+import re
+
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 
 from app.models import File
 
-# from rest_framework.authtoken.models import Token
-
 User = get_user_model()
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})
-    # token = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = User
         fields = ['username', 'email', 'password', 'fullname']
 
+    def validate_username(self, value):
+        pattern = r"^[A-Za-z][A-Za-z0-9]+$"
+
+        if len(value) < 4 or len(value) > 20:
+            raise serializers.ValidationError("Недопустимая длина логина")
+
+        if not re.match(pattern, value):
+            raise serializers.ValidationError("Недопустимый формат логина")
+
+        return value
+
+    def validate_password(self, value):
+        if len(value) < 6:
+            raise serializers.ValidationError("Длина пароля < 6 смволов")
+
+        if not any(c.isupper() for c in value):
+            raise serializers.ValidationError("В пароле требуется хотя бы одна заглавная буква.")
+
+        if not any(c.islower() for c in value):
+            raise serializers.ValidationError("В пароле требуется хотя бы одна строчная буква.")
+
+        if not any(c.isdigit() for c in value):
+            raise serializers.ValidationError("В пароле требуется хотя бы одна цифра.")
+
+        if not re.search('[@#$%&*()<>?!]',value):
+            raise serializers.ValidationError("В пароле требуется хотя бы один спецсимвол.")
+
+        return value
+
     def create(self, validated_data):
         password = validated_data.pop('password')
         user = User.objects.create_user(**validated_data, password=password)
-        # token, _ = Token.objects.get_or_create(user=user)
-        # user.token = token
+
         return user
 
     def get_token(self, obj):

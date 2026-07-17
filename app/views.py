@@ -1,19 +1,22 @@
+import json
+import logging
 from pathlib import Path
 
 from django.db.models import ProtectedError
 from django.http import FileResponse
 from django.utils import timezone
 from rest_framework import generics, status
+from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.exceptions import PermissionDenied, NotFound
-from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
-from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import File
+from .models import File, User
 from .serializers import RegisterSerializer, User, UsersSerializer, FileSerializer
 
+logger = logging.getLogger(__name__)
 
 # Регистрация нового пользователя
 class RegisterView(generics.CreateAPIView):
@@ -22,20 +25,39 @@ class RegisterView(generics.CreateAPIView):
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
 
-        user = serializer.save()
-        token, _ = Token.objects.get_or_create(user=user)
+        if not serializer.is_valid():
+            errors_json = json.dumps(serializer.errors, ensure_ascii=False)
+            logger.warning(
+                f"Регистрация не пройдена. Ошибки валидации: {errors_json}.",
+            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'fullname': user.fullname,
-            },
-            'token': token.key,
-        }, status=status.HTTP_201_CREATED)
+        try:
+            user = serializer.save()
+            token, _ = Token.objects.get_or_create(user=user)
+
+            logger.info(
+                f"Пользователь успешно зарегистрирован. "
+                f"User ID: {user.id}, username: {user.username}.",
+            )
+
+            return Response({
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'fullname': user.fullname,
+                },
+                'token': token.key,
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception:
+            logger.exception("Сбой при регистрации пользователя.")
+            return Response(
+                {"detail": "Произошла внутренняя ошибка."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 		
 class CustomObtainAuthToken(ObtainAuthToken):
@@ -44,10 +66,19 @@ class CustomObtainAuthToken(ObtainAuthToken):
             data=request.data,
             context={'request': request}
         )
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            username = serializer.data.get("username", 'Unknown')
+            logger.warning(
+                f"Логин отказ. User: {username} {serializer.errors}.",
+            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
         user = serializer.validated_data['user']
 
         token, _ = Token.objects.get_or_create(user=user)
+        logger.info(
+            f"Логин пользователя {user.username}: {user.fullname}"
+        )
 
         return Response({
             'token': token.key,
@@ -75,6 +106,14 @@ class UsersRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated, IsAdminUser]
 
     def destroy(self, request, *args, **kwargs):
+        user_id_to_delete = kwargs['pk']
+        username = self.request.user.username
+        fullname = self.request.user.fullname
+
+        logger.info(
+            f"Удаление пользователя ID {user_id_to_delete}. Администратор: {username} - {fullname}"
+        )
+
         try:
             return super().destroy(request, *args, **kwargs)
         except ProtectedError as protected_error:
@@ -82,9 +121,23 @@ class UsersRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
                 {"id": obj.pk, "label": str(obj)}
                 for obj in protected_error.protected_objects
             ]
+
+            logger.warning(
+                f"Отказ удаления пользовавтеля ID {user_id_to_delete}. "
+                f"Осталось файлов: {len(protected_elements)}. "
+                f"Администратор: {username} - {fullname}",
+            )
+
             return Response(
                 data={"protected_elements": protected_elements},
                 status=status.HTTP_423_LOCKED
+            )
+
+        except Exception:
+            logger.exception("Сбой при удалении пользователя.")
+            return Response(
+                {"detail": "Произошла внутренняя ошибка."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 			
@@ -100,11 +153,32 @@ class FilesView(APIView):
     # Загрузка файла (multipart)
     def post(self, request):
         serializer = FileSerializer(data=request.data, context={"request": request})
-        if serializer.is_valid():
+        print('upload', self.request.data)
+        logger.info(
+            f"Загрузка файла {self.request.data['original_name']}. "
+            f"User: {self.request.user.username} - {self.request.user.fullname}."
+        )
+
+        if not serializer.is_valid():
+            logger.warning(
+                f"Не удалось загрузить файл. Ошибка в данных"
+                f"{serializer.errors}",
+            )
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        try :
             serializer.save()
+            logger.info(
+                f"Файл успешно загружен"
+            )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("Сбой при загрузке файла")
+            return Response(
+                {"detail": "Произошла внутренняя ошибка"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class FileDetailView(APIView):
@@ -113,6 +187,10 @@ class FileDetailView(APIView):
     def _get_object(self, pk):
         obj = File.objects.get(pk=pk)
         if (obj.owner != self.request.user) and not self.request.user.is_staff:
+            logger.warning(
+                f"Отказ в доступе к хранилищу (FileDetailView). "
+                f"User: {self.request.user.id} {self.request.user.username} - недостаточно прав",
+            )
             raise PermissionDenied("Отказано в доступе - недостаточно прав")
         return obj
 
@@ -158,6 +236,10 @@ class FilesByUserForAdminView(APIView):
     def get(self, request, pk):
         # Проверка прав: админ или сам пользователь
         if not request.user.is_staff and int(pk) != request.user.id:
+            logger.warning(
+                f"Отказ в доступе к хранилищу пользователя ID: {pk}. "
+                f"User: {self.request.user.id} {self.request.user.username} - недостаточно прав",
+            )
             raise PermissionDenied("Отказано в доступа к хранилищу - недостаточно прав")
 
         files = File.objects.filter(owner_id=pk)
@@ -177,6 +259,10 @@ class DownloadFileView(APIView):
             raise NotFound("Запрошенный файл не найден")
 
         if file_obj.owner != request.user and not request.user.is_staff:
+            logger.warning(
+                f"Отказ в доступе к хранилищу пользователя ID: {pk}. "
+                f"User: {self.request.user.id} {self.request.user.username} - недостаточно прав",
+            )
             raise PermissionDenied("Отказано в доступа к файлу - недостаточно прав")
 
         file_obj.downloaded_at = timezone.now()
