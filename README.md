@@ -18,8 +18,8 @@
 - _username_ - логин пользователя (4-20 символов), 
 вводится при регистрации
 - _password_ - хешированный пароль пользователя, 
-вводится при регистрации
-- _is_staff_ - признак администратора
+вводится при регистрации, затем хешируется средствами _django_
+- _is_staff_ - признак наличия прав администратора
 - _email_ - e-mail пользователя, вводится при регистрации
 - _fullname_ - полное имя пользователя, вводится при регистрации
 - _directory_ - имя личной папки пользователя, формируется 
@@ -50,7 +50,7 @@
 #### Авторизация и регистрация:
 - POST api/register/ - регистрация пользователя — с валидацией входных 
 данных на соответствие требованиям, описанным выше;
-- POST api-token-auth/ - авторизация пользователя по логину и паролю.
+- POST api/api-token-auth/ - авторизация пользователя по логину и паролю.
 
 #### Файловое хранилище:
 - GET api/files/ - получение списка файлов пользователя;
@@ -82,16 +82,205 @@
 
 ## 2. Развёртывание приложения
 
-Для развёртывания приложения на сервере Ubuntu необходимы следующее:
+Для развёртывания приложения на сервере Ubuntu необходимо следующее:
 
-1. На сервере установить git, postgreSQL, python3.14+, python-pip, python-venv
-2. В postgreSQL создать пользователя с правами суперпользователя для управления
-базой данных django-приложения. Рекомендуется то же имя пользователя, что и в Ubuntu
-3. В postgreSQL создать базу данных django-приложения от имени созданного пользователя
-4. Склонировать в домашнюю папку django-приложение из репозитория и перейти в склонированную папку
-5. Установить зависимости в соответствии с requirements.txt
-6. Создать файл .env по образцу .env.example, указав в нем необходимые параметры
-7. Провести миграцию
-8. Создать суперпользователя django, он и будет первым администратором приложения
-9. 
+### 2.1 Установка и запуск Django-DRF API
 
+- На сервере создать пользователя (в дальнейшем USER), от имени которого будет работать django
+- На сервере установить git, postgreSQL, python3.14+, python-pip, python-venv, npm
+```
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git postgresql python3 python3-pip python3-venv npm 
+```
+- Зайти на сервер под именем _USER_
+- В postgreSQL создать пользователя _USER_ с правами суперпользователя для управления 
+базой данных django-приложения и базу данных _USER_
+```
+sudo su postgres
+psql
+postgres=# create user USER with superuser;
+postgres=# alter user USER with password 'USER_PASSWORD';
+postgres=# create database USER;
+postgres-# \q
+exit
+```
+- В postgreSQL создать базу данных django-приложения _DB_NAME_ от имени _USER_
+```
+psql
+<user>=# create database DB_NAME;
+<user>=# \q
+```
+- Склонировать в домашнюю папку django-приложение из репозитория и перейти в склонированную папку
+```
+git clone https://github.com/nick-shishmarev/my-cloud-frontend.git
+cd my-cloud-frontend
+```
+- Создать и активировать виртуальное окружение
+```
+python3 -m venv <venv_name>
+source <venv_name>.bin.activate 
+```
+- Установить зависимости в соответствии с _requirements.txt_.
+```
+sudo apt update
+sudo apt install -y libpq-dev python3-dev build-essential
+pip3 install -r requirements.txt
+```
+- Создать файл _.env_, указав в нем необходимые параметры:
+```
+SECRET_KEY=ваш секретный ключ
+DEBUG=False
+DATABASE_URL=postgres://USER:USER_PASSWORD@locaLhost:5432/DB_NAME
+ALLOWED_HOSTS=localhost,127.0.0.1
+CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+```
+- Провести миграцию
+```
+python3 manage.py makemigrations
+python3 manage.py migrate
+```
+- Создать суперпользователя _django_, он и будет первым администратором приложения
+```
+python3 manage.py createsuperuser
+```
+- Создать папку _logs_ для логов _django_
+```
+mkdir logs
+```
+- Установить _gunicorn_
+```
+pip install gunicorn
+```
+- Создать файл _/etc/systemd/system/gunicorn.service_
+```
+[Unit]
+Description=gunicorn daemon for Django
+After=network.target
+
+[Service]
+User=USER
+Group=www-data
+WorkingDirectory=/home/cetus/my-cloud-backend
+ExecStart=/home/cetus/my-cloud-backend/venv/bin/gunicorn \
+    --access-logfile - \
+    --error-logfile - \
+    --workers 3 \
+    --bind 127.0.0.1:8000 \
+    diplom.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
+```
+- Запустить _Django-DRF API_
+```
+sudo systemctl daemon-reload
+sudo systemctl enable gunicorn
+sudo systemctl start gunicorn
+sudo systemctl status gunicorn
+```
+### 2.2 Установить статические файлы фронтенда
+- Склонировать в домашнюю папку исходники проекта фронтенда (React)
+```
+cd ~
+git clone https://github.com/nick-shishmarev/my-cloud-frontend.git
+
+```
+- Перейти в папку фронтенда, установить зависимости и собрать проект
+```
+cd my-cloud-frontend/
+npm ci
+npm run build
+```
+- Отредактировать файл _config.json_
+```
+nano dist/config.json
+```
+Содержимое файла config.json:
+```
+{
+  "BASE_URL": "",
+  "BASE_URL_MEDIA": "http://195.19.12.27"
+}
+```
+- Скопировать файлы из dist в папку _/var/www/my_cloud_frontend_
+```
+cd ..
+sudo mkdir /var/www/my_cloud_frontend
+sudo cp my-cloud-frontend/dist/*.* /var/www/my_cloud_frontend
+```
+- После копирования папку _my-cloud-frontend_ можно удалить
+```doctest
+rm -rf my-cloud-frontend/
+```
+### 2.3 Установить и настроить Nginx
+- Установить _Nginx_
+```
+sudo apt update
+sudo apt install nginx
+
+```
+- Создать файл _/etc/nginx/sites-available/diplom_
+```
+sudo nano /etc/nginx/sites-available/diplom
+```
+с содержимым:
+```
+server {
+     listen 80;
+     server_name <ip-адрес или домен сервера>;
+     
+     # Максимальный размер загружаемых файлов
+     client_max_body_size 10M;
+
+     root /var/www/my_cloud_frontend;
+     index index.html;
+
+     # API (Django через Gunicorn)
+     location /api/ {
+         proxy_pass http://127.0.0.1:8000;
+         proxy_set_header Host $host;
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # таймауты для долгих запросов
+         proxy_read_timeout 300s;
+         proxy_connect_timeout 75s;
+     }
+
+    # Медиафайлы 
+    location /media/ {
+        alias /home/cetus/my-cloud-backend/media/;
+    }
+
+    # Статика React (собранный проект: build/dist)
+     location / {
+     #    root /var/www/my-cloud-react-frontend;
+     #    root /home/cetus/my-cloud-frontend/dist;
+         try_files $uri $uri/ /index.html;
+     }
+
+     # location = /favicon.ico {
+     #     log_not_found off;
+     #     access_log off;
+     # }
+
+    # Логи
+     access_log /var/log/nginx/my_cloud_access.log;
+     error_log  /var/log/nginx/my_cloud_error.log warn;
+}
+```
+- Создать симлинк
+```
+sudo ln -s /etc/nginx/sites-available/myproject /etc/nginx/sites-enabled/
+```
+- Проверить конфигурацию _Nginx_
+```
+sudo nginx -t      # проверка синтаксиса
+```
+если проверка прошла, перегрузить _Nginx_
+```
+sudo systemctl reload nginx
+```
+После развёртывания сервер работает по адресу _ip-адрес или домен сервера_, 
+указанному в файле _/etc/nginx/sites-available/diplom_
