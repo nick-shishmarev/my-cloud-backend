@@ -86,7 +86,7 @@
 
 ### 2.1 Установка и запуск Django-DRF API
 
-- На сервере создать пользователя (в дальнейшем USER), от имени которого будет работать django
+- На сервере создать пользователя (в дальнейшем _USER_ или <user>), от имени которого будет работать django
 - На сервере установить git, postgreSQL, python3.14+, python-pip, python-venv, npm
 ```
 sudo apt update && sudo apt upgrade -y
@@ -98,29 +98,30 @@ sudo apt install -y git postgresql python3 python3-pip python3-venv npm
 ```
 sudo su postgres
 psql
-postgres=# create user USER with superuser;
-postgres=# alter user USER with password 'USER_PASSWORD';
-postgres=# create database USER;
+postgres=# create user <user> with superuser;
+postgres=# alter user <user> with password 'USER_PASSWORD';
+postgres=# create database <user>;
 postgres-# \q
 exit
 ```
 - В postgreSQL создать базу данных django-приложения _DB_NAME_ от имени _USER_
 ```
 psql
-<user>=# create database DB_NAME;
+<user>=# create database <DB_NAME>;
 <user>=# \q
 ```
 - Склонировать в домашнюю папку django-приложение из репозитория и перейти в склонированную папку
 ```
-git clone https://github.com/nick-shishmarev/my-cloud-frontend.git
-cd my-cloud-frontend
+git clone https://github.com/nick-shishmarev/my-cloud-backend.git
+cd my-cloud-backend
 ```
 - Создать и активировать виртуальное окружение
 ```
 python3 -m venv <venv_name>
 source <venv_name>.bin.activate 
 ```
-- Установить зависимости в соответствии с _requirements.txt_.
+- Установить библиотеки  libpq-dev, python3-dev, build-essential и зависимости
+в соответствии с _requirements.txt_.
 ```
 sudo apt update
 sudo apt install -y libpq-dev python3-dev build-essential
@@ -130,7 +131,7 @@ pip3 install -r requirements.txt
 ```
 SECRET_KEY=ваш секретный ключ
 DEBUG=False
-DATABASE_URL=postgres://USER:USER_PASSWORD@locaLhost:5432/DB_NAME
+DATABASE_URL=postgres://<user>:<user_password>@locaLhost:5432/<DB_NAME>
 ALLOWED_HOSTS=localhost,127.0.0.1
 CORS_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
 ```
@@ -191,6 +192,12 @@ cd my-cloud-frontend/
 npm ci
 npm run build
 ```
+- Установить права пользователей напапку _dist_ и её содержимое
+```
+sudo chown -R <user>:www-data /home/cetus/my-cloud-frontend
+sudo find /home/cetus/my-cloud-frontend -type d -exec chmod 755 {} \;
+sudo find /home/cetus/my-cloud-frontend -type f -exec chmod 644 {} \;
+```
 - Отредактировать файл _config.json_
 ```
 nano dist/config.json
@@ -199,7 +206,7 @@ nano dist/config.json
 ```
 {
   "BASE_URL": "",
-  "BASE_URL_MEDIA": "http://195.19.12.27"
+  "BASE_URL_MEDIA": "http://<ip-адрес или домен сервера>"
 }
 ```
 - Переместить папку dist в папку _/var/www с переименованием в my_cloud_frontend_
