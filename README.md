@@ -202,14 +202,15 @@ nano dist/config.json
   "BASE_URL_MEDIA": "http://195.19.12.27"
 }
 ```
-- Скопировать файлы из dist в папку _/var/www/my_cloud_frontend_
+- Переместить папку dist в папку _/var/www с переименованием в my_cloud_frontend_
 ```
 cd ..
-sudo mkdir /var/www/my_cloud_frontend
-sudo cp my-cloud-frontend/dist/*.* /var/www/my_cloud_frontend
+sudo rm -rf /var/www/my_cloud_frontend/
+sudo mv ./my-cloud-frontend/dist /var/www/my_cloud_frontend
+
 ```
-- После копирования папку _my-cloud-frontend_ можно удалить
-```doctest
+- После перемещения _dist_ папку _my-cloud-frontend_ можно удалить
+```
 rm -rf my-cloud-frontend/
 ```
 ### 2.3 Установить и настроить Nginx
