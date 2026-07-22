@@ -192,7 +192,7 @@ cd my-cloud-frontend/
 npm ci
 npm run build
 ```
-- Установить права пользователей напапку _dist_ и её содержимое
+- Установить права пользователей на папку _dist_ и её содержимое
 ```
 sudo chown -R <user>:www-data /home/cetus/my-cloud-frontend
 sudo find /home/cetus/my-cloud-frontend -type d -exec chmod 755 {} \;
